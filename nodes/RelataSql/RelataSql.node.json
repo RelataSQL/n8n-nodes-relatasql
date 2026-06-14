@@ -1,0 +1,14 @@
+{
+  "node": "n8n-nodes-relatasql.relataSql",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Development", "Data & Storage"],
+  "resources": {
+    "credentialDocumentation": [
+      { "url": "https://github.com/LeoPro23/relatasql-n8n#credentials" }
+    ],
+    "primaryDocumentation": [
+      { "url": "https://github.com/LeoPro23/relatasql-n8n#readme" }
+    ]
+  }
+}

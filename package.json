@@ -1,0 +1,57 @@
+{
+  "name": "n8n-nodes-relatasql",
+  "version": "0.1.0",
+  "description": "n8n community node for RelataSQL — run SQL, inspect schemas, and govern writes across your database connections using a RelataSQL API key.",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "relatasql",
+    "sql",
+    "postgres",
+    "database"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/LeoPro23/relatasql-n8n",
+  "author": {
+    "name": "RelataLabs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeoPro23/relatasql-n8n.git"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint nodes credentials package.json",
+    "lintfix": "eslint nodes credentials package.json --fix"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/RelataSqlApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/RelataSql/RelataSql.node.js"
+    ]
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.0",
+    "gulp": "^4.0.2",
+    "n8n-workflow": "*",
+    "typescript": "^5.4.0"
+  }
+}
