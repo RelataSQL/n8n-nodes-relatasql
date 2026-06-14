@@ -40,6 +40,7 @@ export class RelataSql implements INodeType {
         type: 'options',
         noDataExpression: true,
         options: [
+          { name: 'Backup', value: 'backups' },
           { name: 'Connection', value: 'connection' },
           { name: 'Database', value: 'database' },
           { name: 'Schema', value: 'schema' },
@@ -154,6 +155,49 @@ export class RelataSql implements INodeType {
           },
         ],
         default: 'requestApproval',
+      },
+
+      // ── Operations: Backups ─────────────────────────────────────
+      {
+        displayName: 'Operation',
+        name: 'operation',
+        type: 'options',
+        noDataExpression: true,
+        displayOptions: { show: { resource: ['backups'] } },
+        options: [
+          {
+            name: 'List Schedules',
+            value: 'listSchedules',
+            action: 'List backup schedules',
+            description: 'List the backup schedules reachable with this API key',
+          },
+          {
+            name: 'Trigger Run',
+            value: 'triggerRun',
+            action: 'Trigger a backup run now',
+            description: 'Manually run a backup schedule immediately',
+          },
+          {
+            name: 'List Logs',
+            value: 'listLogs',
+            action: 'List recent backup runs',
+            description: 'List recent backup run logs',
+          },
+        ],
+        default: 'listSchedules',
+      },
+
+      // ── scheduleId (backups → triggerRun) ───────────────────────
+      {
+        displayName: 'Schedule Name or ID',
+        name: 'scheduleId',
+        type: 'options',
+        typeOptions: { loadOptionsMethod: 'getSchedules' },
+        required: true,
+        default: '',
+        description:
+          'The backup schedule to run. Choose from the list, or specify an ID using an expression.',
+        displayOptions: { show: { resource: ['backups'], operation: ['triggerRun'] } },
       },
 
       // ── connectionId (database / schema) ────────────────────────
@@ -293,6 +337,25 @@ export class RelataSql implements INodeType {
         return (schema.tables ?? []).map((t) => ({
           name: `${t.schema}.${t.name}`,
           value: `${t.schema}.${t.name}`,
+        }));
+      },
+
+      async getSchedules(
+        this: ILoadOptionsFunctions,
+      ): Promise<INodePropertyOptions[]> {
+        const schedules = (await relataApiRequest.call(
+          this,
+          'GET',
+          '/mcp/backups/schedules',
+        )) as Array<{
+          id: string;
+          name: string;
+          cron: string;
+          enabled: boolean;
+        }>;
+        return (schedules ?? []).map((s) => ({
+          name: `${s.name} (${s.cron})${s.enabled ? '' : ' — disabled'}`,
+          value: s.id,
         }));
       },
     },
@@ -471,6 +534,36 @@ async function runOperation(
         `/mcp/write-approvals/${encodeURIComponent(approvalId)}/execute`,
       )) as RelataQueryResult;
       return resultToItems(res);
+    }
+  }
+
+  if (resource === 'backups') {
+    if (operation === 'listSchedules') {
+      const res = (await relataApiRequest.call(
+        this,
+        'GET',
+        '/mcp/backups/schedules',
+      )) as IDataObject[];
+      return res ?? [];
+    }
+
+    if (operation === 'triggerRun') {
+      const scheduleId = this.getNodeParameter('scheduleId', i) as string;
+      const res = (await relataApiRequest.call(
+        this,
+        'POST',
+        `/mcp/backups/schedules/${encodeURIComponent(scheduleId)}/run`,
+      )) as IDataObject;
+      return [res];
+    }
+
+    if (operation === 'listLogs') {
+      const res = (await relataApiRequest.call(
+        this,
+        'GET',
+        '/mcp/backups/logs',
+      )) as IDataObject[];
+      return res ?? [];
     }
   }
 

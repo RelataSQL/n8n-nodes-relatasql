@@ -42,6 +42,11 @@ The credential **Test** lists your connections to verify the key.
 - *Check Approval* → poll its status (a human approves it in RelataSQL → Settings → MCP → Approvals).
 - *Execute Approved* → run the approved statement.
 
+**Backup**
+- *List Schedules* — backup schedules reachable with this API key (also powers the schedule dropdown).
+- *Trigger Run* — run a schedule now (fire-and-forget; poll *List Logs* for the result).
+- *List Logs* — recent backup runs (status, size, duration, error).
+
 ## Important constraints
 
 - **Enable the connection first.** Programmatic access is gated: in RelataSQL go to **Settings → MCP** and enable
