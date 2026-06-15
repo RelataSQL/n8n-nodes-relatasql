@@ -7,6 +7,7 @@ import type {
   INodeType,
   INodeTypeDescription,
 } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 
 import {
   relataApiRequest,
@@ -75,6 +76,13 @@ export class RelataSql implements INodeType {
         noDataExpression: true,
         displayOptions: { show: { resource: ['database'] } },
         options: [
+          {
+            name: 'Create Dump',
+            value: 'createDump',
+            action: 'Create a compressed SQL dump',
+            description:
+              'Run pg_dump/mysqldump and return a .sql.gz binary file (e.g. to upload to Google Drive)',
+          },
           {
             name: 'Execute Query',
             value: 'executeQuery',
@@ -270,6 +278,30 @@ export class RelataSql implements INodeType {
         displayOptions: { show: { resource: ['database'], operation: ['sampleRows'] } },
       },
 
+      // ── Create Dump options ─────────────────────────────────────
+      {
+        displayName: 'Scope',
+        name: 'scope',
+        type: 'options',
+        options: [
+          { name: 'Structure + Data', value: 'structure-and-data' },
+          { name: 'Structure Only', value: 'structure-only' },
+          { name: 'Data Only', value: 'data-only' },
+        ],
+        default: 'structure-and-data',
+        description: 'What to include in the dump',
+        displayOptions: { show: { resource: ['database'], operation: ['createDump'] } },
+      },
+      {
+        displayName: 'Put Output File in Field',
+        name: 'binaryPropertyName',
+        type: 'string',
+        default: 'data',
+        required: true,
+        hint: 'The name of the output binary field to write the .sql.gz file to',
+        displayOptions: { show: { resource: ['database'], operation: ['createDump'] } },
+      },
+
       // ── Justification (sandbox / requestApproval) ───────────────
       {
         displayName: 'Justification',
@@ -370,6 +402,10 @@ export class RelataSql implements INodeType {
 
     for (let i = 0; i < items.length; i++) {
       try {
+        if (resource === 'database' && operation === 'createDump') {
+          returnData.push(await createDumpItem.call(this, i));
+          continue;
+        }
         const out = await runOperation.call(this, resource, operation, i);
         for (const json of out) {
           returnData.push({ json, pairedItem: { item: i } });
@@ -568,6 +604,110 @@ async function runOperation(
   }
 
   throw new Error(`Unsupported operation "${operation}" for resource "${resource}"`);
+}
+
+/**
+ * Database → Create Dump: POST the dump request, receive the gzipped binary,
+ * and emit it as an n8n binary item (ready for a Google Drive / S3 / FTP node).
+ */
+async function createDumpItem(
+  this: IExecuteFunctions,
+  i: number,
+): Promise<INodeExecutionData> {
+  const connectionId = this.getNodeParameter('connectionId', i) as string;
+  const scope = this.getNodeParameter('scope', i, 'structure-and-data') as string;
+  const binaryProperty = this.getNodeParameter(
+    'binaryPropertyName',
+    i,
+    'data',
+  ) as string;
+
+  const allowedScopes = ['structure-and-data', 'structure-only', 'data-only'];
+  if (!allowedScopes.includes(scope)) {
+    throw new NodeOperationError(
+      this.getNode(),
+      `Invalid scope "${scope}". Use one of: ${allowedScopes.join(', ')}.`,
+    );
+  }
+
+  const credentials = await this.getCredentials('relataSqlApi');
+  const baseUrl = String(credentials.baseUrl ?? '').replace(/\/+$/, '');
+
+  let response: { body: unknown; headers: IDataObject };
+  try {
+    response = (await this.helpers.httpRequestWithAuthentication.call(
+      this,
+      'relataSqlApi',
+      {
+        method: 'POST',
+        url: `${baseUrl}/mcp/connections/${encodeURIComponent(connectionId)}/dump`,
+        body: JSON.stringify({ scope }),
+        headers: { 'Content-Type': 'application/json' },
+        json: false,
+        encoding: 'arraybuffer',
+        returnFullResponse: true,
+      },
+    )) as { body: unknown; headers: IDataObject };
+  } catch (error) {
+    throw mapDumpError(this, error);
+  }
+
+  const raw = response.body;
+  let buffer: Buffer;
+  if (Buffer.isBuffer(raw)) {
+    buffer = raw;
+  } else if (raw instanceof Uint8Array || raw instanceof ArrayBuffer) {
+    buffer = Buffer.from(raw as ArrayBuffer);
+  } else {
+    throw new NodeOperationError(
+      this.getNode(),
+      'RelataSQL returned an empty or unexpected dump response.',
+    );
+  }
+  const disposition = String(response.headers?.['content-disposition'] ?? '');
+  const m = /filename="?([^"]+)"?/.exec(disposition);
+  const fileName = m ? m[1] : `${connectionId}.sql.gz`;
+
+  const binaryData = await this.helpers.prepareBinaryData(
+    buffer,
+    fileName,
+    'application/gzip',
+  );
+
+  return {
+    json: { fileName, mimeType: 'application/gzip', sizeBytes: buffer.length },
+    binary: { [binaryProperty]: binaryData },
+    pairedItem: { item: i },
+  };
+}
+
+function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
+  let text = typeof error?.message === 'string' ? error.message : '';
+  const body = error?.response?.body;
+  if (body) {
+    try {
+      text +=
+        ' ' +
+        (Buffer.isBuffer(body)
+          ? body.toString('utf8')
+          : typeof body === 'string'
+            ? body
+            : JSON.stringify(body));
+    } catch {
+      /* ignore */
+    }
+  }
+  if (text.includes('JIT_ACCESS_REQUIRED')) {
+    return new NodeOperationError(
+      ctx.getNode(),
+      'This RelataSQL connection is not enabled for programmatic (API key) access.',
+      {
+        description:
+          'Enable MCP access for this connection in RelataSQL → Settings → MCP (pick an indefinite grant for unattended n8n flows), then retry.',
+      },
+    );
+  }
+  return new NodeOperationError(ctx.getNode(), text.trim() || 'Create Dump failed');
 }
 
 /** Maps a columnar query result to row objects; never returns zero items. */

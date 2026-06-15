@@ -29,10 +29,13 @@ The credential **Test** lists your connections to verify the key.
 **Connection**
 - *List* — connections reachable with this API key (also powers the connection dropdown).
 
-**Database** (Postgres; queries run read-only)
+**Database** (Postgres + MySQL; queries run read-only)
 - *Execute Query* — run a read-only SQL query and return one item per row.
 - *Sample Rows* — first N rows of a table.
 - *Run in Sandbox* — execute SQL inside a transaction that is always rolled back (safe test).
+- *Create Dump* — run pg_dump/mysqldump and return a compressed `.sql.gz` as **binary**,
+  ready to hand to a Google Drive / Dropbox / S3 / FTP upload node. Scope = structure+data /
+  structure-only / data-only. Requires a paid plan.
 
 **Schema**
 - *Get Tables* / *Get Columns* / *Get Relations* — introspect a connection.
@@ -55,6 +58,11 @@ The credential **Test** lists your connections to verify the key.
 - **Read vs write.** *Execute Query* is read-only by design. Mutations go through the **Write (with approval)**
   flow, which requires a human approval in the RelataSQL UI.
 - **PostgreSQL only** for query/schema in this version. MySQL/MSSQL execution is coming on the backend.
+
+## Example: back up a database to Google Drive
+
+`RelataSQL: Create Dump` (pick the connection) → `Google Drive: Upload` (binary field `data`). Add a
+Schedule Trigger in front for a nightly backup to your own Drive — no intermediate storage needed.
 
 ## Example: move data between databases
 
