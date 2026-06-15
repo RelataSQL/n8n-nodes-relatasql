@@ -10,7 +10,7 @@ export class RelataSqlApi implements ICredentialType {
 
   displayName = 'RelataSQL API';
 
-  documentationUrl = 'https://github.com/LeoPro23/n8n-nodes-relatasql';
+  documentationUrl = 'https://github.com/RelataSQL/n8n-nodes-relatasql';
 
   properties: INodeProperties[] = [
     {

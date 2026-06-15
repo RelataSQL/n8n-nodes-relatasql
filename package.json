@@ -11,13 +11,13 @@
     "database"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/LeoPro23/n8n-nodes-relatasql",
+  "homepage": "https://github.com/RelataSQL/n8n-nodes-relatasql",
   "author": {
     "name": "RelataLabs"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LeoPro23/n8n-nodes-relatasql.git"
+    "url": "git+https://github.com/RelataSQL/n8n-nodes-relatasql.git"
   },
   "engines": {
     "node": ">=20.15"
