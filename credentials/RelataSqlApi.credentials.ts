@@ -2,6 +2,7 @@ import type {
   IAuthenticateGeneric,
   ICredentialTestRequest,
   ICredentialType,
+  Icon,
   INodeProperties,
 } from 'n8n-workflow';
 
@@ -9,6 +10,8 @@ export class RelataSqlApi implements ICredentialType {
   name = 'relataSqlApi';
 
   displayName = 'RelataSQL API';
+
+  icon: Icon = 'file:relatasql.png';
 
   documentationUrl = 'https://github.com/RelataSQL/n8n-nodes-relatasql';
 

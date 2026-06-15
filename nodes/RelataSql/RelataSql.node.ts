@@ -21,7 +21,7 @@ export class RelataSql implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'RelataSQL',
     name: 'relataSql',
-    icon: 'file:relatasql.svg',
+    icon: 'file:relatasql.png',
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
