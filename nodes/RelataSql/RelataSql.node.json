@@ -5,10 +5,10 @@
   "categories": ["Development", "Data & Storage"],
   "resources": {
     "credentialDocumentation": [
-      { "url": "https://github.com/LeoPro23/relatasql-n8n#credentials" }
+      { "url": "https://github.com/LeoPro23/n8n-nodes-relatasql#credentials" }
     ],
     "primaryDocumentation": [
-      { "url": "https://github.com/LeoPro23/relatasql-n8n#readme" }
+      { "url": "https://github.com/LeoPro23/n8n-nodes-relatasql#readme" }
     ]
   }
 }

@@ -11,20 +11,21 @@
     "database"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/LeoPro23/relatasql-n8n",
+  "homepage": "https://github.com/LeoPro23/n8n-nodes-relatasql",
   "author": {
     "name": "RelataLabs"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LeoPro23/relatasql-n8n.git"
+    "url": "git+https://github.com/LeoPro23/n8n-nodes-relatasql.git"
   },
   "engines": {
     "node": ">=20.15"
   },
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc && gulp build:icons",
+    "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint nodes credentials package.json",
