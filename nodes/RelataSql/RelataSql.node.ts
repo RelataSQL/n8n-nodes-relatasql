@@ -763,7 +763,7 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
       'Create Dump requires a paid RelataSQL plan.',
       {
         description:
-          'The selected account or workspace is on the Free plan. Upgrade to Pro or Team, then retry this n8n workflow. PostgreSQL and Google Drive credentials are not the problem.',
+          'Your current RelataSQL plan does not include automated database dumps. Upgrade to Pro or Team, then retry this workflow.',
       },
     );
   }
@@ -777,7 +777,7 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
       'RelataSQL rejected this dump request before the database export started.',
       {
         description:
-          'For Create Dump, a 403 usually means the workspace plan does not allow API dumps, the API key cannot access this connection, or MCP access is not enabled for the connection. Check RelataSQL Settings -> Plan & Billing and Settings -> MCP.',
+          'Check that the selected RelataSQL connection is enabled for API access and that this API key belongs to the same workspace.',
       },
     );
   }
@@ -788,11 +788,7 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
       'RelataSQL could not create the database dump.',
       {
         description:
-          text
-            .replace(/\s+/g, ' ')
-            .replace(/^.*DUMP_PROCESS_FAILED[^\w]*/i, '')
-            .trim() ||
-          'The backend reached the database export step, but pg_dump/mysqldump failed. Check the database connection, server network access, DB credentials, and dump timeout.',
+          'Verify the selected connection in RelataSQL and try again. If it keeps failing, contact RelataSQL support with this n8n execution time.',
       },
     );
   }
@@ -803,10 +799,10 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
   ) {
     return new NodeOperationError(
       ctx.getNode(),
-      'RelataSQL reached the dump step, but the export failed on the backend.',
+      'RelataSQL could not create the database dump.',
       {
         description:
-          'This is not a plan gate. For Pro accounts, the usual causes are pg_dump/mysqldump failing, backend network access to the database, database credentials, an old connection ID, or a dump timeout. Check relataback logs for the exact dump error.',
+          'Verify the selected connection in RelataSQL and try again. If it keeps failing, contact RelataSQL support with this n8n execution time.',
       },
     );
   }
