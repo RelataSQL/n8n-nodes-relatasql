@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-relatasql",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "n8n community node for RelataSQL — run SQL, inspect schemas, and govern writes across your database connections using a RelataSQL API key.",
   "keywords": [
     "n8n-community-node-package",

@@ -681,22 +681,67 @@ async function createDumpItem(
   };
 }
 
-function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
-  let text = typeof error?.message === 'string' ? error.message : '';
-  const body = error?.response?.body;
-  if (body) {
+function extractDumpErrorDetails(error: any): { text: string; statusCode?: number } {
+  const parts: string[] = [];
+  const statusCode = [
+    error?.statusCode,
+    error?.status,
+    error?.httpCode,
+    error?.response?.statusCode,
+    error?.response?.status,
+  ].find((value) => typeof value === 'number') as number | undefined;
+
+  const addObject = (value: Record<string, unknown>) => {
+    for (const key of ['code', 'message', 'error', 'description']) {
+      const part = value[key];
+      if (typeof part === 'string') parts.push(part);
+      else if (Array.isArray(part)) parts.push(part.join(', '));
+    }
     try {
-      text +=
-        ' ' +
-        (Buffer.isBuffer(body)
-          ? body.toString('utf8')
-          : typeof body === 'string'
-            ? body
-            : JSON.stringify(body));
+      parts.push(JSON.stringify(value));
     } catch {
       /* ignore */
     }
-  }
+  };
+
+  const addBody = (body: unknown) => {
+    if (!body) return;
+    try {
+      if (Buffer.isBuffer(body)) {
+        addBody(body.toString('utf8'));
+      } else if (body instanceof ArrayBuffer) {
+        addBody(Buffer.from(body).toString('utf8'));
+      } else if (body instanceof Uint8Array) {
+        addBody(Buffer.from(body).toString('utf8'));
+      } else if (typeof body === 'string') {
+        parts.push(body);
+        try {
+          const parsed = JSON.parse(body) as unknown;
+          if (parsed && typeof parsed === 'object') {
+            addObject(parsed as Record<string, unknown>);
+          }
+        } catch {
+          /* body was plain text */
+        }
+      } else if (typeof body === 'object') {
+        addObject(body as Record<string, unknown>);
+      }
+    } catch {
+      /* ignore malformed error bodies */
+    }
+  };
+
+  addBody(error?.message);
+  addBody(error?.description);
+  addBody(error?.response?.body);
+  addBody(error?.response?.data);
+  addBody(error?.error);
+
+  return { text: parts.join(' | '), statusCode };
+}
+
+function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
+  const { text, statusCode } = extractDumpErrorDetails(error);
   if (text.includes('JIT_ACCESS_REQUIRED')) {
     return new NodeOperationError(
       ctx.getNode(),
@@ -707,6 +752,65 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
       },
     );
   }
+
+  if (
+    text.includes('DUMP_REQUIRES_PAID_PLAN') ||
+    text.includes('Upgrade to Pro to create database backups from the API') ||
+    text.toLowerCase().includes('create dump requires a paid relatasql plan')
+  ) {
+    return new NodeOperationError(
+      ctx.getNode(),
+      'Create Dump requires a paid RelataSQL plan.',
+      {
+        description:
+          'The selected account or workspace is on the Free plan. Upgrade to Pro or Team, then retry this n8n workflow. PostgreSQL and Google Drive credentials are not the problem.',
+      },
+    );
+  }
+
+  if (
+    statusCode === 403 ||
+    text.toLowerCase().includes('forbidden - perhaps check your credentials')
+  ) {
+    return new NodeOperationError(
+      ctx.getNode(),
+      'RelataSQL rejected this dump request before the database export started.',
+      {
+        description:
+          'For Create Dump, a 403 usually means the workspace plan does not allow API dumps, the API key cannot access this connection, or MCP access is not enabled for the connection. Check RelataSQL Settings -> Plan & Billing and Settings -> MCP.',
+      },
+    );
+  }
+
+  if (text.includes('DUMP_PROCESS_FAILED')) {
+    return new NodeOperationError(
+      ctx.getNode(),
+      'RelataSQL could not create the database dump.',
+      {
+        description:
+          text
+            .replace(/\s+/g, ' ')
+            .replace(/^.*DUMP_PROCESS_FAILED[^\w]*/i, '')
+            .trim() ||
+          'The backend reached the database export step, but pg_dump/mysqldump failed. Check the database connection, server network access, DB credentials, and dump timeout.',
+      },
+    );
+  }
+
+  if (
+    statusCode === 500 ||
+    text.toLowerCase().includes('the service failed to process your request')
+  ) {
+    return new NodeOperationError(
+      ctx.getNode(),
+      'RelataSQL reached the dump step, but the export failed on the backend.',
+      {
+        description:
+          'This is not a plan gate. For Pro accounts, the usual causes are pg_dump/mysqldump failing, backend network access to the database, database credentials, an old connection ID, or a dump timeout. Check relataback logs for the exact dump error.',
+      },
+    );
+  }
+
   return new NodeOperationError(ctx.getNode(), text.trim() || 'Create Dump failed');
 }
 
