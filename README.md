@@ -18,7 +18,7 @@ extensions folder (`~/.n8n/custom`) or set `N8N_CUSTOM_EXTENSIONS` to its path.
 
 Create a **RelataSQL API** credential:
 
-- **Base URL** — your RelataSQL backend (relataback) API base, e.g. `https://api.your-domain.com` (no trailing slash).
+- **Base URL** — RelataSQL API base URL. Defaults to the official cloud API `https://api.relatasql.com` (no trailing slash).
 - **API Key** — generated in RelataSQL → **Settings → API Keys** (starts with `relata_live_`). Sent as
   `Authorization: Bearer <key>`.
 

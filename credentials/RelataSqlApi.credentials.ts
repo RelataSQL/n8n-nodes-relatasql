@@ -20,11 +20,11 @@ export class RelataSqlApi implements ICredentialType {
       displayName: 'Base URL',
       name: 'baseUrl',
       type: 'string',
-      default: '',
+      default: 'https://api.relatasql.com',
       required: true,
-      placeholder: 'https://api.your-relatasql-domain.com',
+      placeholder: 'https://api.relatasql.com',
       description:
-        'Base URL of your RelataSQL backend (relataback) API, with no trailing slash.',
+        'RelataSQL API base URL (no trailing slash). Keep the default cloud API URL.',
     },
     {
       displayName: 'API Key',
