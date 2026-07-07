@@ -633,7 +633,7 @@ async function createDumpItem(
   const credentials = await this.getCredentials('relataSqlApi');
   const baseUrl = String(credentials.baseUrl ?? '').replace(/\/+$/, '');
 
-  let response: { body: unknown; headers: IDataObject };
+  let response: { body: unknown; headers: IDataObject; statusCode?: number };
   try {
     response = (await this.helpers.httpRequestWithAuthentication.call(
       this,
@@ -646,15 +646,30 @@ async function createDumpItem(
         json: false,
         encoding: 'arraybuffer',
         returnFullResponse: true,
+        // Don't throw on 4xx/5xx: with arraybuffer encoding n8n discards the
+        // error body, so we'd lose the backend's real reason (code, detail,
+        // support reference). We inspect the status ourselves below.
+        ignoreHttpStatusErrors: true,
         // A large database can take many minutes to dump. Wait up to 2h so the
         // node never gives up before the backend's own dump timeout
         // (DUMP_TIMEOUT_MS, default 2h). A reverse proxy in front of RelataSQL
         // must allow an equally long read/idle timeout.
         timeout: 2 * 60 * 60 * 1000,
       },
-    )) as { body: unknown; headers: IDataObject };
+    )) as { body: unknown; headers: IDataObject; statusCode?: number };
   } catch (error) {
+    // Transport-level failure (timeout, connection reset) — still throws.
     throw mapDumpError(this, error);
+  }
+
+  // HTTP error status: the (arraybuffer) body holds the JSON error; hand the
+  // whole thing to mapDumpError so it surfaces the backend's real reason.
+  const status = Number(response.statusCode ?? 200);
+  if (status >= 400) {
+    throw mapDumpError(this, {
+      statusCode: status,
+      response: { statusCode: status, body: response.body },
+    });
   }
 
   const raw = response.body;
@@ -686,8 +701,13 @@ async function createDumpItem(
   };
 }
 
-function extractDumpErrorDetails(error: any): { text: string; statusCode?: number } {
+function extractDumpErrorDetails(error: any): {
+  text: string;
+  statusCode?: number;
+  detail?: string;
+} {
   const parts: string[] = [];
+  let detail: string | undefined;
   const statusCode = [
     error?.statusCode,
     error?.status,
@@ -697,10 +717,13 @@ function extractDumpErrorDetails(error: any): { text: string; statusCode?: numbe
   ].find((value) => typeof value === 'number') as number | undefined;
 
   const addObject = (value: Record<string, unknown>) => {
-    for (const key of ['code', 'message', 'error', 'description']) {
+    for (const key of ['code', 'message', 'error', 'description', 'detail']) {
       const part = value[key];
-      if (typeof part === 'string') parts.push(part);
-      else if (Array.isArray(part)) parts.push(part.join(', '));
+      if (typeof part === 'string') {
+        parts.push(part);
+        // The backend's `detail` carries the real dump-tool error.
+        if (key === 'detail' && part.trim()) detail = part.trim();
+      } else if (Array.isArray(part)) parts.push(part.join(', '));
     }
     try {
       parts.push(JSON.stringify(value));
@@ -742,7 +765,7 @@ function extractDumpErrorDetails(error: any): { text: string; statusCode?: numbe
   addBody(error?.response?.data);
   addBody(error?.error);
 
-  return { text: parts.join(' | '), statusCode };
+  return { text: parts.join(' | '), statusCode, detail };
 }
 
 /** Pulls the backend's support reference (dump-<uuid>) out of an error body. */
@@ -754,10 +777,11 @@ function extractSupportReference(text: string): string | undefined {
 }
 
 function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
-  const { text, statusCode } = extractDumpErrorDetails(error);
+  const { text, statusCode, detail } = extractDumpErrorDetails(error);
   const lower = text.toLowerCase();
   const ref = extractSupportReference(text);
   const refHint = ref ? ` Support reference: ${ref}.` : '';
+  const detailHint = detail ? ` Backend error: ${detail}` : '';
 
   // Client- or proxy-side timeout: the node/proxy gave up waiting. Distinct
   // from a backend dump failure so the user knows to raise the time limit
@@ -832,6 +856,7 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
       {
         description:
           'Verify the selected connection in RelataSQL and try again. If the database is large, the export may have exceeded the dump time limit — raise DUMP_TIMEOUT_MS on the backend. If it keeps failing, contact RelataSQL support with the support reference and this n8n execution time.' +
+          detailHint +
           refHint,
       },
     );
@@ -839,7 +864,7 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
 
   return new NodeOperationError(
     ctx.getNode(),
-    (text.trim() || 'Create Dump failed') + refHint,
+    (text.trim() || 'Create Dump failed') + detailHint + refHint,
   );
 }
 
