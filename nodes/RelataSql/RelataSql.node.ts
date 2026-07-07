@@ -646,6 +646,11 @@ async function createDumpItem(
         json: false,
         encoding: 'arraybuffer',
         returnFullResponse: true,
+        // A large database can take many minutes to dump. Wait up to 2h so the
+        // node never gives up before the backend's own dump timeout
+        // (DUMP_TIMEOUT_MS, default 2h). A reverse proxy in front of RelataSQL
+        // must allow an equally long read/idle timeout.
+        timeout: 2 * 60 * 60 * 1000,
       },
     )) as { body: unknown; headers: IDataObject };
   } catch (error) {
@@ -740,8 +745,42 @@ function extractDumpErrorDetails(error: any): { text: string; statusCode?: numbe
   return { text: parts.join(' | '), statusCode };
 }
 
+/** Pulls the backend's support reference (dump-<uuid>) out of an error body. */
+function extractSupportReference(text: string): string | undefined {
+  const m =
+    /"supportReference"\s*:\s*"([^"]+)"/.exec(text) ??
+    /(dump-[0-9a-fA-F-]{8,})/.exec(text);
+  return m?.[1];
+}
+
 function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
   const { text, statusCode } = extractDumpErrorDetails(error);
+  const lower = text.toLowerCase();
+  const ref = extractSupportReference(text);
+  const refHint = ref ? ` Support reference: ${ref}.` : '';
+
+  // Client- or proxy-side timeout: the node/proxy gave up waiting. Distinct
+  // from a backend dump failure so the user knows to raise the time limit
+  // rather than "check the connection".
+  if (
+    statusCode === 504 ||
+    statusCode === 408 ||
+    lower.includes('econnaborted') ||
+    lower.includes('etimedout') ||
+    lower.includes('socket hang up') ||
+    /timeout of \d+ *ms exceeded/.test(lower) ||
+    lower.includes('timed out')
+  ) {
+    return new NodeOperationError(
+      ctx.getNode(),
+      'The database dump timed out before it finished.',
+      {
+        description:
+          'The database is large and the export exceeded the time limit. Raise DUMP_TIMEOUT_MS on the RelataSQL backend (and any reverse-proxy read/idle timeout), then retry. For very large databases, consider dumping "Structure only" or splitting the export by table.',
+      },
+    );
+  }
+
   if (text.includes('JIT_ACCESS_REQUIRED')) {
     return new NodeOperationError(
       ctx.getNode(),
@@ -782,32 +821,26 @@ function mapDumpError(ctx: IExecuteFunctions, error: any): Error {
     );
   }
 
-  if (text.includes('DUMP_PROCESS_FAILED')) {
-    return new NodeOperationError(
-      ctx.getNode(),
-      'RelataSQL could not create the database dump.',
-      {
-        description:
-          'Verify the selected connection in RelataSQL and try again. If it keeps failing, contact RelataSQL support with this n8n execution time.',
-      },
-    );
-  }
-
   if (
+    text.includes('DUMP_PROCESS_FAILED') ||
     statusCode === 500 ||
-    text.toLowerCase().includes('the service failed to process your request')
+    lower.includes('the service failed to process your request')
   ) {
     return new NodeOperationError(
       ctx.getNode(),
       'RelataSQL could not create the database dump.',
       {
         description:
-          'Verify the selected connection in RelataSQL and try again. If it keeps failing, contact RelataSQL support with this n8n execution time.',
+          'Verify the selected connection in RelataSQL and try again. If the database is large, the export may have exceeded the dump time limit — raise DUMP_TIMEOUT_MS on the backend. If it keeps failing, contact RelataSQL support with the support reference and this n8n execution time.' +
+          refHint,
       },
     );
   }
 
-  return new NodeOperationError(ctx.getNode(), text.trim() || 'Create Dump failed');
+  return new NodeOperationError(
+    ctx.getNode(),
+    (text.trim() || 'Create Dump failed') + refHint,
+  );
 }
 
 /** Maps a columnar query result to row objects; never returns zero items. */
