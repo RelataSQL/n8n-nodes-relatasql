@@ -6,3 +6,7 @@ dist
 .env.*
 .idea
 .vscode
+
+# Documentación y utilidades internas — este repositorio es público
+CLAUDE.md
+.githooks/

@@ -32,7 +32,8 @@
     "lintfix": "eslint nodes credentials package.json --fix"
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
