@@ -9,6 +9,7 @@ Dates are npm publish dates.
 ## [Unreleased]
 
 ### Changed
+- The community node is now published under the canonical RelataLabs npm scope as `@relatalabs/n8n-nodes-relatasql`.
 - Wording and formatting of the node description in the package metadata.
 
 ## [0.1.7] — 2026-07-07
