@@ -9,7 +9,7 @@ execute safely against your databases. That keeps token costs on your side and a
 
 ## Installation
 
-In n8n: **Settings → Community Nodes → Install** and enter `n8n-nodes-relatasql`.
+In n8n: **Settings → Community Nodes → Install** and enter `@relatalabs/n8n-nodes-relatasql`.
 
 Self-hosted/manual: build this package (`npm install && npm run build`) and place/link it under your n8n custom
 extensions folder (`~/.n8n/custom`) or set `N8N_CUSTOM_EXTENSIONS` to its path.

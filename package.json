@@ -1,5 +1,5 @@
 {
-  "name": "n8n-nodes-relatasql",
+  "name": "@relatalabs/n8n-nodes-relatasql",
   "version": "0.1.7",
   "description": "n8n community node for RelataSQL - run SQL, inspect schemas, and govern writes across your database connections using a RelataSQL API key.",
   "keywords": [
@@ -55,5 +55,8 @@
     "gulp": "^4.0.2",
     "n8n-workflow": "*",
     "typescript": "^5.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
